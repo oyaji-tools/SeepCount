@@ -5,12 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>おやすみ羊</title>
 
-  <!-- PWA対応の設定 -->
+  <!-- PWA設定 -->
   <meta name="theme-color" content="#05070c">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="おやすみ羊">
-  <link rel="manifest" id="manifestLink">
+  <link rel="manifest" href="manifest.json">
 
   <style>
     body {
@@ -27,7 +27,6 @@
       user-select: none;
     }
     
-    /* カウント表示の文字を大きく */
     .count-display {
       font-size: 38px;
       color: #8a9cb0;
@@ -37,7 +36,6 @@
       font-weight: bold;
     }
 
-    /* ボタンを押しやすく・大きく設定 */
     button {
       background-color: #121926;
       color: #94a3b8;
@@ -54,7 +52,6 @@
       background-color: #1e293b;
     }
 
-    /* 羊のフィールド */
     .field {
       position: absolute;
       width: 100%;
@@ -63,7 +60,6 @@
       overflow: hidden;
     }
 
-    /* 羊のサイズも大きめに調整 */
     .sheep {
       position: absolute;
       left: -100px;
@@ -109,7 +105,6 @@
     .leg1 { left: 24px; }
     .leg2 { left: 46px; }
 
-    /* アニメーション */
     @keyframes walk {
       0% { transform: translateX(0); opacity: 0; }
       10% { opacity: 0.7; }
@@ -145,26 +140,9 @@
   </div>
 
 <script>
-  // PWA用のマニフェスト動的生成
-  const manifestData = {
-    "name": "おやすみ羊",
-    "short_name": "おやすみ羊",
-    "start_url": ".",
-    "display": "standalone",
-    "background_color": "#05070c",
-    "theme_color": "#05070c"
-  };
-  const stringManifest = JSON.stringify(manifestData);
-  const blob = new Blob([stringManifest], {type: 'application/json'});
-  const manifestURL = URL.createObjectURL(blob);
-  document.getElementById('manifestLink').setAttribute('href', manifestURL);
-
-  // ダミーのServiceWorker登録（PWAインストール要件を満たすため）
+  // Service Worker の正規登録
   if ('serviceWorker' in navigator) {
-    const swCode = `self.addEventListener('fetch', function(e) {});`;
-    const swBlob = new Blob([swCode], { type: 'text/javascript' });
-    const swUrl = URL.createObjectURL(swBlob);
-    navigator.serviceWorker.register(swUrl).catch(function() {});
+    navigator.serviceWorker.register('sw.js').catch(() => {});
   }
 
   let isRunning = false;
