@@ -257,20 +257,19 @@ async function speakSmoothly(text) {
   }
 }
 
-<!-- 退避
-  function speakSmoothly(text) {
-    if ('speechSynthesis' in window) {
-      window.speechSynthesis.cancel();
-
-      const uttr = new SpeechSynthesisUtterance("　" + text);
-      uttr.lang = 'ja-JP';
-      uttr.rate = 0.55;
-      uttr.pitch = 0.7;
-      uttr.volume = 0.7;
-
-      window.speechSynthesis.speak(uttr);
-    }
-  }
+//  function speakSmoothly(text) {
+//    if ('speechSynthesis' in window) {
+//      window.speechSynthesis.cancel();
+//
+//      const uttr = new SpeechSynthesisUtterance("　" + text);
+//      uttr.lang = 'ja-JP';
+//      uttr.rate = 0.55;
+//      uttr.pitch = 0.7;
+//      uttr.volume = 0.7;
+//
+//      window.speechSynthesis.speak(uttr);
+//    }
+//  }
 
  -->
 
