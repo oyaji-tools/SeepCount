@@ -1,0 +1,265 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>おやすみ羊カウント</title>
+  <style>
+    body {
+      background-color: #05070c;
+      color: #5a6b7c;
+      font-family: sans-serif;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+      margin: 0;
+      overflow: hidden;
+    }
+    .count-display {
+      font-size: 26px;
+      color: #3a4b5c;
+      margin-bottom: 20px;
+      text-align: center;
+      z-index: 10;
+    }
+    button {
+      background-color: #0d131f;
+      color: #4a5b6c;
+      border: 1px solid #1a2536;
+      padding: 12px 32px;
+      border-radius: 24px;
+      font-size: 15px;
+      cursor: pointer;
+      z-index: 10;
+    }
+    
+    /* 羊のフィールド */
+    .field {
+      position: absolute;
+      width: 100%;
+      height: 120px;
+      bottom: 20%;
+      overflow: hidden;
+    }
+
+    /* 羊のデザイン */
+    .sheep {
+      position: absolute;
+      left: -80px;
+      width: 60px;
+      height: 40px;
+      opacity: 0;
+    }
+    .sheep-body {
+      position: absolute;
+      width: 44px;
+      height: 30px;
+      background: #2a3644;
+      border-radius: 20px;
+      top: 5px;
+      left: 10px;
+    }
+    .sheep-body::before, .sheep-body::after {
+      content: '';
+      position: absolute;
+      background: #2a3644;
+      border-radius: 50%;
+    }
+    .sheep-body::before { width: 22px; height: 22px; top: -8px; left: 6px; }
+    .sheep-body::after { width: 22px; height: 22px; top: -8px; left: 18px; }
+    
+    .sheep-head {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      background: #1d2530;
+      border-radius: 50%;
+      top: 8px;
+      right: 2px;
+    }
+    .sheep-leg {
+      position: absolute;
+      width: 4px;
+      height: 10px;
+      background: #1d2530;
+      bottom: 0;
+      border-radius: 2px;
+    }
+    .leg1 { left: 18px; }
+    .leg2 { left: 36px; }
+
+    /* 歩く・横切るアニメーション */
+    @keyframes walk {
+      0% { transform: translateX(0); opacity: 0; }
+      10% { opacity: 0.6; }
+      90% { opacity: 0.6; }
+      100% { transform: translateX(calc(100vw + 100px)); opacity: 0; }
+    }
+    @keyframes bob {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-4px); }
+    }
+    .anim-walk {
+      animation: walk 7s linear forwards;
+    }
+    .anim-bob {
+      animation: bob 0.8s ease-in-out infinite;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="count-display" id="displayText">準備完了</div>
+  <button id="toggleBtn" onclick="toggleApp()">スタート</button>
+
+  <div class="field">
+    <div class="sheep" id="sheep">
+      <div class="anim-bob">
+        <div class="sheep-body"></div>
+        <div class="sheep-head"></div>
+        <div class="sheep-leg leg1"></div>
+        <div class="sheep-leg leg2"></div>
+      </div>
+    </div>
+  </div>
+
+<script>
+  let isRunning = false;
+  let count = 0;
+  let timer = null;
+  let audioCtx = null;
+  let bgmGain = null;
+  let bgmOscs = [];
+  let wakeLock = null;
+
+  async function requestWakeLock() {
+    try {
+      if ('wakeLock' in navigator) {
+        wakeLock = await navigator.wakeLock.request('screen');
+      }
+    } catch (err) {}
+  }
+
+  function releaseWakeLock() {
+    if (wakeLock !== null) {
+      wakeLock.release();
+      wakeLock = null;
+    }
+  }
+
+  function startBGM() {
+    try {
+      if (!audioCtx) {
+        audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+      }
+      if (audioCtx.state === 'suspended') {
+        audioCtx.resume();
+      }
+
+      bgmGain = audioCtx.createGain();
+      bgmGain.gain.setValueAtTime(0.012, audioCtx.currentTime);
+      bgmGain.connect(audioCtx.destination);
+
+      const freqs = [130.81, 164.81, 196.00, 246.94];
+
+      freqs.forEach((freq, index) => {
+        const osc = audioCtx.createOscillator();
+        const lfo = audioCtx.createOscillator();
+        const lfoGain = audioCtx.createGain();
+        const oscGain = audioCtx.createGain();
+
+        osc.type = 'sine';
+        osc.frequency.value = freq;
+
+        lfo.type = 'sine';
+        lfo.frequency.value = 0.06 + (index * 0.02);
+        lfoGain.gain.value = 0.006;
+
+        lfo.connect(oscGain.gain);
+        osc.connect(oscGain);
+        oscGain.connect(bgmGain);
+
+        osc.start();
+        lfo.start();
+
+        bgmOscs.push(osc, lfo);
+      });
+    } catch(e) {}
+  }
+
+  function stopBGM() {
+    if (bgmGain && audioCtx) {
+      bgmGain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + 2.0);
+      setTimeout(() => {
+        bgmOscs.forEach(o => {
+          try { o.stop(); } catch(e) {}
+        });
+        bgmOscs = [];
+      }, 2000);
+    }
+  }
+
+  // ノイズ（プツッ音）を低減した読み上げ機能
+  function speakSmoothly(text) {
+    if ('speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+
+      // 先頭にわずかなスペースを入れてオーディオデバイスの急な起動ノイズを和らげる
+      const uttr = new SpeechSynthesisUtterance("　" + text);
+      uttr.lang = 'ja-JP';
+      uttr.rate = 0.55;
+      uttr.pitch = 0.7;
+      uttr.volume = 0.7;
+
+      window.speechSynthesis.speak(uttr);
+    }
+  }
+
+  function triggerSheepAnimation() {
+    const sheep = document.getElementById('sheep');
+    sheep.classList.remove('anim-walk');
+    void sheep.offsetWidth; // リセット用のリフロー発生
+    sheep.classList.add('anim-walk');
+  }
+
+  function nextSheep() {
+    if (!isRunning) return;
+
+    count++;
+    const text = `羊が${count}匹`;
+    document.getElementById('displayText').textContent = text;
+
+    // アニメーションと読み上げを開始
+    triggerSheepAnimation();
+    speakSmoothly(text);
+
+    timer = setTimeout(nextSheep, 9000);
+  }
+
+  function toggleApp() {
+    const btn = document.getElementById('toggleBtn');
+    if (isRunning) {
+      isRunning = false;
+      clearTimeout(timer);
+      if ('speechSynthesis' in window) {
+        window.speechSynthesis.cancel();
+      }
+      stopBGM();
+      releaseWakeLock();
+      document.getElementById('displayText').textContent = 'おやすみなさい';
+      btn.textContent = 'スタート';
+    } else {
+      isRunning = true;
+      count = 0;
+      btn.textContent = 'ストップ';
+      requestWakeLock();
+      startBGM();
+      timer = setTimeout(nextSheep, 1500);
+    }
+  }
+</script>
+
+</body>
+</html>
